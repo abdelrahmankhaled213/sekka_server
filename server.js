@@ -121,6 +121,48 @@ app.get("/test-db", async (req, res) => {
   }
 });
 
+app.post("/create-post", async (req, res) => {
+  try {
+    const { user_id, title, description, station_name, type, category } = req.body;
+
+    // Awal khatawa: el-Insert (w n-esta5dem .select().single() 3ashan el ID)
+    const { data, error } = await supabase
+      .from("posts")
+      .insert({ 
+        user_id, 
+        title, 
+        description, 
+        station_name, 
+        type, 
+        category, 
+        is_active: true 
+      })
+      .select()
+      .single();
+
+    if (error) throw error; // Law feh moshkela fel DB mesh haykamel lel notification
+
+    // Tany khatawa: N-nady el Topic ba3d ma el insert nege7
+    const message = {
+      notification: {
+        title: `حاجة ${type == 'lost' ? 'ضاعت' : 'لقيناها'} جديدة! 📢`,
+        body: `${title} في محطة ${station_name}`,
+      },
+      topic: "posts", // Dah el esm elly el-nas kollo moshtarek feeh
+      data: {
+        postId: data.id.toString(), // Ba3atna el ID el gdid elly lssa rag3 elhalan
+        type: type,
+      },
+    };
+
+    await admin.messaging().send(message);
+
+    res.json({ success: true, postId: data.id });
+
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 
 const PORT = process.env.PORT || 3000;
