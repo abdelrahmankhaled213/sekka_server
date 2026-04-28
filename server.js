@@ -172,7 +172,6 @@ app.post("/create-post", async (req, res) => {
   }
 });
 
-
 app.get("/get-posts", async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -183,21 +182,22 @@ app.get("/get-posts", async (req, res) => {
           name,
           image
         ),
-      comments:comments(count)
+        comments (count) 
       `) 
       .order("created_at", { ascending: false });
 
     if (error) throw error;
 
+    
     res.json({
       success: true,
       data: data,
     });
   } catch (e) {
+    console.error("❌ Error fetching posts:", e.message);
     res.status(500).json({ error: e.message });
   }
 });
-
 
 
 const PORT = process.env.PORT || 3000;
