@@ -199,6 +199,46 @@ app.get("/get-posts", async (req, res) => {
   }
 });
 
+app.get("/get_posts/:id",async(req,res)=>{
+
+const {id}=req.params;
+
+try{
+
+  const { data, error } = await supabase
+  .from("posts")
+  .select(`
+    *,
+    users ( 
+      name,
+      image
+    ),
+    comments (
+      content,
+      created_at,
+      user_id,
+      users ( 
+        name,
+        image
+      )
+    )
+  `)
+  .eq("id", id)
+  .single();
+  if(error) throw error;
+  res.json(data);
+}catch(e){
+  console.error(e);
+  res.status(500).json({error:e.message});
+}
+
+
+} 
+
+)
+
+
+
 
 const PORT = process.env.PORT || 3000;
 
