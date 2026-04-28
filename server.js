@@ -178,8 +178,8 @@ app.get("/get-posts", async (req, res) => {
       .select(`
         *,
         users (
-          user_name,
-          user_image
+          name,
+          image
         )
       `) 
       .order("created_at", { ascending: false });
