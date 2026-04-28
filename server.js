@@ -124,6 +124,8 @@ app.get("/test-db", async (req, res) => {
 app.post("/create-post", async (req, res) => {
   try {
 
+    const { user_id, title, description, type, category, station_name } = req.body;
+    
     const { data, error } = await supabase
       .from("posts") 
       .insert([
