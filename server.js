@@ -123,43 +123,49 @@ app.get("/test-db", async (req, res) => {
 
 app.post("/create-post", async (req, res) => {
   try {
-    const { user_id, title, description, station_name, type, category } = req.body;
 
-    // Awal khatawa: el-Insert (w n-esta5dem .select().single() 3ashan el ID)
     const { data, error } = await supabase
-      .from("posts")
-      .insert({ 
-        user_id, 
-        title, 
-        description, 
-        station_name, 
-        type, 
-        category, 
-        is_active: true 
-      })
+      .from("posts") 
+      .insert([
+        {
+          user_id,
+          title,
+          description,
+          type,
+          category,
+          station_name,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        }
+      ])
       .select()
       .single();
 
-    if (error) throw error; // Law feh moshkela fel DB mesh haykamel lel notification
+    if (error) throw error;
 
-    // Tany khatawa: N-nady el Topic ba3d ma el insert nege7
     const message = {
       notification: {
-        title: `حاجة ${type == 'lost' ? 'ضاعت' : 'لقيناها'} جديدة! 📢`,
-        body: `${title} في محطة ${station_name}`,
+        title: `New ${type} item!`,
+        body: `${title} at ${station_name}`,
       },
-      topic: "posts", // Dah el esm elly el-nas kollo moshtarek feeh
+
+      topic: "posts", 
       data: {
-        postId: data.id.toString(), // Ba3atna el ID el gdid elly lssa rag3 elhalan
-        type: type,
+        postId: data.id.toString(),
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
       },
     };
 
     await admin.messaging().send(message);
 
-    res.json({ success: true, postId: data.id });
+    res.json({
+      success: true,
+      message: "Post created and notification sent! 🚀",
+      data: data
+    });
 
   } catch (e) {
+    console.error(e);
     res.status(500).json({ error: e.message });
   }
 });
