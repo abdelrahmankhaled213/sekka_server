@@ -137,7 +137,7 @@ app.post("/create-post", async (req, res) => {
           category,
           station_name,
           is_active: true,
-          created_at: new Date().toISOString(),
+          created_at: new Date(),
         }
       ])
       .select()
