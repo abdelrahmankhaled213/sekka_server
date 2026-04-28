@@ -182,7 +182,8 @@ app.get("/get-posts", async (req, res) => {
         users (
           name,
           image
-        )
+        ),
+      comments:comments(count)
       `) 
       .order("created_at", { ascending: false });
 
