@@ -170,8 +170,29 @@ app.post("/create-post", async (req, res) => {
   }
 });
 
+app.get("/get-posts", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("posts")
+      .select("*")  
+      .order("created_at", { ascending: false }); 
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      data: data,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
+
+
+
+
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("🚀 Server running on port " + PORT);
