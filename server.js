@@ -170,12 +170,19 @@ app.post("/create-post", async (req, res) => {
   }
 });
 
+
 app.get("/get-posts", async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("posts")
-      .select("*")  
-      .order("created_at", { ascending: false }); 
+      .select(`
+        *,
+        users (
+          user_name,
+          user_image
+        )
+      `) 
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
 
@@ -187,6 +194,8 @@ app.get("/get-posts", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+
 
 const PORT = process.env.PORT || 3000;
 
