@@ -111,15 +111,6 @@ app.post("/save-token", async (req, res) => {
 });
 
 
-app.get("/test-db", async (req, res) => {
-  try {
-    const { data, error } = await supabase.from("user_devices").select("*");
-    if (error) throw error;
-    res.json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
 
 app.post("/create-post", async (req, res) => {
   try {
@@ -194,7 +185,7 @@ app.get("/get-posts", async (req, res) => {
       data: data,
     });
   } catch (e) {
-    console.error("❌ Error fetching posts:", e.message);
+    console.error("Error fetching posts:", e.message);
     res.status(500).json({ error: e.message });
   }
 });
@@ -268,6 +259,73 @@ app.get("/get-post-comments/:postId", async (req, res) => {
   }
 });
 
+app.post("/create-comment", async (req, res) => {
+  try {
+    const { user_id, post_id, content } = req.body;
+
+    const { data, error } = await supabase.from("comments").insert([
+      {
+        user_id,
+        post_id,
+        content,
+        created_at: new Date(),
+      },
+    ]);
+if(error) throw error;
+const message = {
+      notification: {
+        title: "New comment!",
+        body: content,
+      },
+
+      topic: "comments", 
+      data: {
+        postId: post_id.toString(),
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
+      },
+    };
+
+    await admin.messaging().send(message);
+    
+    res.json({
+      success: true,
+      message: "Comment created! 🚀",
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put("/update-post/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase
+      .from("posts")
+      .update({ is_active: false })
+      .eq("id", id);
+    if (error) throw error;
+    res.json({
+      success: true,
+      message: "Post updated! 🚀",
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete("/delete-post/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase.from("posts").delete().eq("id", id);
+    if (error) throw error;
+    res.json({
+      success: true,
+      message: "Post deleted! 🚀",
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 
