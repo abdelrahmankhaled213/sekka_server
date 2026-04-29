@@ -238,13 +238,38 @@ try{
 )
 
 
+app.get("/get-post-comments/:postId", async (req, res) => {
+  try {
+    const { postId } = req.params;
+
+    const { data, error } = await supabase
+      .from("comments")
+      .select(`
+        id,
+        content,
+        created_at,
+        user_id,
+        users ( 
+          name,
+          image
+        )
+      `)
+      .eq("post_id", postId)
+      .order("created_at", { ascending: true }); 
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      data: data,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 
 const PORT = process.env.PORT || 3000;
-
-
-
-
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("🚀 Server running on port " + PORT);
