@@ -259,26 +259,30 @@ app.get("/get-post-comments/:postId", async (req, res) => {
   }
 });
 
+
 app.post("/create-comment", async (req, res) => {
   try {
-    const { user_id, post_id, content } = req.body;
+    const {  post_id ,user_id, content } = req.body;
 
-    const { data, error } = await supabase.from("comments").insert([
-      {
-        user_id,
-        post_id,
-        content,
-        created_at: new Date(),
-      },
-    ]);
-if(error) throw error;
-const message = {
+    
+    const { data, error } = await supabase
+      .from("comments")
+      .insert([{  post_id, user_id , content }]) 
+      .select(`
+        *,
+        users (name, image)
+      `)
+      .single();
+
+    if (error) throw error;
+
+    const message = {
       notification: {
         title: "New comment!",
         body: content,
       },
-
-      topic: "comments", 
+     
+      topic: `post_${post_id}`, 
       data: {
         postId: post_id.toString(),
         click_action: "FLUTTER_NOTIFICATION_CLICK",
@@ -286,15 +290,17 @@ const message = {
     };
 
     await admin.messaging().send(message);
-    
+
     res.json({
       success: true,
-      message: "Comment created! 🚀",
+      data: data,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
+
+
 
 app.put("/update-post/:id", async (req, res) => {
   try {
