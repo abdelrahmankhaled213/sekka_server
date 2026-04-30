@@ -303,33 +303,68 @@ app.post("/create-comment", async (req, res) => {
 });
 
 
-
 app.put("/update-post/:id", async (req, res) => {
   try {
     const { id } = req.params;
+    const updates = req.body; 
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: "No data provided to update! 🤷‍♂️" });
+    }
+
     const { data, error } = await supabase
       .from("posts")
-      .update({ is_active: false })
-      .eq("id", id);
+      .update(updates) 
+      .eq("id", id)
+      .select();
+
     if (error) throw error;
+
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found! ❌",
+      });
+    }
+
     res.json({
       success: true,
-      message: "Post updated! 🚀",
+      message: "Post updated successfully! 🚀",
+      updatedData: data[0],
     });
+
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
+
 app.delete("/delete-post/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { data, error } = await supabase.from("posts").delete().eq("id", id);
+  
+    const { data, error } = await supabase
+      .from("posts")
+      .delete()
+      .eq("id", id)
+      .select(); 
+
     if (error) throw error;
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found! ❌",
+      });
+    }
+
     res.json({
       success: true,
-      message: "Post deleted! 🚀",
+      message: "Post deleted successfully! 🚀",
+      deletedData: data[0]
     });
+
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
