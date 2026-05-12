@@ -336,11 +336,91 @@ app.put("/update-comment/:commentId", async (req, res) => {
   }
 });
 
+// ==================== MESSAGES ====================
 
 
+app.post("/send-message", async (req, res) => {
+
+  try {
+    
+    const { conversation_id, sender_id, text } = req.body;
+
+    if (!text || text.trim() === "") {
+      return res.status(400).json({ error: "Message text cannot be empty." });
+    }
+
+   
+    const { data: message, error: msgError } = await supabase
+      .from("messages")
+      .insert([
+        {
+          conversation_id,
+          sender_id,
+          text: text.trim(),
+        },
+      ])
+      .select()
+      .single();
+
+    if (msgError) 
+      throw msgError;
+
+    // 2. جيب الـ receiver_id من الـ conversation
+    const { data: conversation, error: convError } = await supabase
+      .from("conversations")
+      .select("user1_id, user2_id")
+      .eq("id", conversation_id)
+      .single();
+
+    if (convError) throw convError;
+
+    // المستلم هو اللي مش بيبعت
+    const receiver_id =
+      conversation.user1_id === sender_id
+        ? conversation.user2_id
+        : conversation.user1_id;
+
+    // 3. جيب الـ FCM token بتاع المستلم
+    const { data: deviceData, error: deviceError } = await supabase
+      .from("user_devices")
+      .select("token")
+      .eq("user_id", receiver_id)
+      .single();
+
+    // لو ماعندوش token متبعتش notification بس كمل عادي
+
+    if (!deviceError && deviceData?.token) {
+      const notifMessage = {
+        notification: {
+          title: "New message",
+          body: text.trim(),
+        },
+        token: deviceData.token,
+        data: {
+          conversation_id: conversation_id.toString(),
+          sender_id: sender_id.toString(),
+          click_action: "FLUTTER_NOTIFICATION_CLICK",
+        },
+      };
+
+      await admin.messaging().send(notifMessage);
+    
+    }
+
+    res.json({
+      success: true,
+      message: "Message sent successfully! 🚀",
+      data: message,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 
 const PORT = process.env.PORT || 3000;
+
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("🚀 Server running on port " + PORT);
