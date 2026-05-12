@@ -343,9 +343,9 @@ app.post("/send-message", async (req, res) => {
 
   try {
     
-    const { conversation_id, sender_id, text } = req.body;
+    const { conversation_id, sender_id, text} = req.body;
 
-    if (!text || text.trim() === "") {
+    if (!text || text.trim() === ""){
       return res.status(400).json({ error: "Message text cannot be empty." });
     }
 
@@ -418,6 +418,21 @@ app.post("/send-message", async (req, res) => {
   }
 });
 
+app.put("/mark-messages-read/:conversationId", async (req, res) => {
+const { conversationId } = req.params;
+
+try {
+  const { data, error } = await supabase
+    .from("messages")
+    .update({ is_read: true })
+    .eq("conversation_id", conversationId)
+    .eq("is_read", false);
+
+}catch(e){
+  console.error(e);
+  res.status(500).json({ error: e.message });
+}
+});
 
 const PORT = process.env.PORT || 3000;
 
