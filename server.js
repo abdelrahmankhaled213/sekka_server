@@ -336,8 +336,6 @@ app.put("/update-comment/:commentId", async (req, res) => {
   }
 });
 
-// ==================== MESSAGES ====================
-
 
 app.post("/send-message", async (req, res) => {
 
@@ -419,20 +417,24 @@ app.post("/send-message", async (req, res) => {
 });
 
 app.put("/mark-messages-read/:conversationId", async (req, res) => {
-const { conversationId } = req.params;
+  const { conversationId } = req.params;
+  const { userId } = req.body; 
 
-try {
-  const { data, error } = await supabase
-    .from("messages")
-    .update({ is_read: true })
-    .eq("conversation_id", conversationId)
-    .eq("is_read", false);
+  try {
+    const { data, error } = await supabase
+      .from("messages")
+      .update({ is_read: true })
+      .eq("conversation_id", conversationId)
+      .eq("is_read", false)
+      .neq("sender_id", userId); 
 
-}catch(e){
-  console.error(e);
-  res.status(500).json({ error: e.message });
-}
+    if (error) throw error;
+    res.status(200).json({ message: "Messages marked as read" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
+
 
 const PORT = process.env.PORT || 3000;
 
