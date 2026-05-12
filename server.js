@@ -5,8 +5,6 @@ const express = require("express");
 const admin = require("firebase-admin");
 const cors = require("cors");
 
-
-
 const app = express();
 app.use(express.json());
 app.use(cors());
@@ -261,20 +259,18 @@ app.get("/get-post-comments/:postId", async (req, res) => {
   }
 });
 
-
 app.post("/create-comment", async (req, res) => {
   try {
-    const {  post_id ,user_id, content } = req.body;
+    const { user_id, post_id, content } = req.body;
 
-    
-    const { data, error } = await supabase
-      .from("comments")
-      .insert([{  post_id, user_id , content }]) 
-      .select(`
-        *,
-        users (name, image)
-      `)
-      .single();
+    const { data, error } = await supabase.from("comments").insert([
+      {
+        user_id,
+        post_id,
+        content,
+        created_at: new Date(),
+      },
+    ]);
 
     if (error) throw error;
 
@@ -283,18 +279,56 @@ app.post("/create-comment", async (req, res) => {
         title: "New comment!",
         body: content,
       },
-     
-      topic: `post_${post_id}`, 
-      data: {
-        postId: post_id.toString(),
+      topic: "comments",
+      data:{
+        postId: post_id,
         click_action: "FLUTTER_NOTIFICATION_CLICK",
-      },
-    };
+      }
+    }
 
     await admin.messaging().send(message);
+    
+    res.json({
+      success: true,
+      message: "Comment created successfully! 🚀",
+      data: data,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete("/delete-comment/:commentId", async (req, res) => {
+  try {
+    const { commentId } = req.params;
+
+    const { data, error } = await supabase.from("comments").delete().eq("id", commentId);
+
+    if (error) throw error;
+
+res.json({
+  success: true,
+  message: "Comment deleted successfully! 🚀",
+  data: data,
+});
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put("/update-comment/:commentId", async (req, res) => {
+
+  try {
+    const { commentId } = req.params;
+    const { content } = req.body;
+
+    const { data, error } = await supabase.from("comments").update({ content }).eq("id", commentId);
+
+    if (error) throw error;
 
     res.json({
       success: true,
+      message: "Comment updated successfully! 🚀",
       data: data,
     });
   } catch (e) {
@@ -303,141 +337,8 @@ app.post("/create-comment", async (req, res) => {
 });
 
 
-app.put("/update-comment/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updates = req.body; 
-
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ error: "No data provided to update! 🤷‍♂️" });
-    }
-
-    const { data, error } = await supabase
-      .from("comments")
-      .update(updates) 
-      .eq("id", id)
-      .select();
-
-    if (error) throw error;
 
 
-    if (!data || data.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Comment not found! ❌",
-      });
-    
-    }
-
-    res.json({
-      success: true,
-      message: "Comment updated successfully! 🚀",
-      updatedData: data[0],
-    });
-  
-  }
-  catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-
-app.delete("/delete-comment/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const { data, error } = await supabase
-      .from("comments")
-      .delete()
-      .eq("id", id)
-      .select();
-
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Comment not found! ❌",
-      });
-    }
-
-    res.json({
-      success: true,
-      message: "Comment deleted successfully! 🚀",
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-
-
-app.put("/update-post/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updates = req.body; 
-
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ error: "No data provided to update! 🤷‍♂️" });
-    }
-
-    const { data, error } = await supabase
-      .from("posts")
-      .update(updates) 
-      .eq("id", id)
-      .select();
-
-    if (error) throw error;
-
-
-    if (!data || data.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found! ❌",
-      });
-    }
-
-    res.json({
-      success: true,
-      message: "Post updated successfully! 🚀",
-      updatedData: data[0],
-    });
-
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-
-app.delete("/delete-post/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-  
-    const { data, error } = await supabase
-      .from("posts")
-      .delete()
-      .eq("id", id)
-      .select(); 
-
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found! ❌",
-      });
-    }
-
-    res.json({
-      success: true,
-      message: "Post deleted successfully! 🚀",
-      deletedData: data[0]
-    });
-
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
 
 const PORT = process.env.PORT || 3000;
 
