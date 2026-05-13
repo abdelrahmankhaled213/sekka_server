@@ -363,29 +363,29 @@ app.post("/send-message", async (req, res) => {
     if (msgError) 
       throw msgError;
 
-    // 2. جيب الـ receiver_id من الـ conversation
+    
+    
     const { data: conversation, error: convError } = await supabase
       .from("conversations")
       .select("user1_id, user2_id")
       .eq("id", conversation_id)
-      .single();
+      .maybeSingle();
 
     if (convError) throw convError;
 
-    // المستلم هو اللي مش بيبعت
+    
+    
     const receiver_id =
-      conversation.user1_id === sender_id
+      conversation.user1_id === sender_issd
         ? conversation.user2_id
         : conversation.user1_id;
 
-    // 3. جيب الـ FCM token بتاع المستلم
-    const { data: deviceData, error: deviceError } = await supabase
-      .from("user_devices")
-      .select("token")
-      .eq("user_id", receiver_id)
-      .single();
-
-    // لو ماعندوش token متبعتش notification بس كمل عادي
+     const { data: deviceData } = await supabase
+       .from("user_devices")
+       .select("token")
+       .eq("user_id", receiver_id)
+       .maybeSingle(); 
+    
 
     if (!deviceError && deviceData?.token) {
       const notifMessage = {
