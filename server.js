@@ -336,82 +336,67 @@ app.put("/update-comment/:commentId", async (req, res) => {
   }
 });
 
-
 app.post("/send-message", async (req, res) => {
-
   try {
-    
-    const { conversation_id, sender_id, text} = req.body;
+    const { conversation_id, sender_id, text } = req.body;
 
-    if (!text || text.trim() === ""){
+    if (!text || text.trim() === "") {
       return res.status(400).json({ error: "Message text cannot be empty." });
     }
 
-   
     const { data: message, error: msgError } = await supabase
       .from("messages")
-      .insert([
-        {
-          conversation_id,
-          sender_id,
-          text: text.trim(),
-        },
-      ])
+      .insert([{
+        conversation_id,
+        sender_id,
+        text: text.trim(),
+      }])
       .select()
       .single();
 
-    if (msgError) 
-      throw msgError;
+    if (msgError) throw msgError;
 
-    
-    
+
     const { data: conversation, error: convError } = await supabase
       .from("conversations")
       .select("user1_id, user2_id")
       .eq("id", conversation_id)
       .maybeSingle();
 
-    if (convError) throw convError;
+    if (convError || !conversation) throw new Error("Conversation not found");
 
-    
-    
-    const receiver_id =
-      conversation.user1_id === sender_issd
-        ? conversation.user2_id
-        : conversation.user1_id;
+    const receiver_id = conversation.user1_id === sender_id
+      ? conversation.user2_id
+      : conversation.user1_id;
 
-     const { data: deviceData } = await supabase
-       .from("user_devices")
-       .select("token")
-       .eq("user_id", receiver_id)
-       .maybeSingle(); 
-    
+    const { data: receiverData } = await supabase
+      .from("user_devices")
+      .select("token, current_chat_id")
+      .eq("user_id", receiver_id)
+      .maybeSingle();
 
-    if (!deviceError && deviceData?.token) {
-      const notifMessage = {
+    if (receiverData?.token && receiverData?.current_chat_id !== conversation_id) {
+      await admin.messaging().send({
         notification: {
           title: "New message",
           body: text.trim(),
         },
-        token: deviceData.token,
+        token: receiverData.token,
         data: {
           conversation_id: conversation_id.toString(),
           sender_id: sender_id.toString(),
-          click_action: "FLUTTER_NOTIFICATION_CLICK",
         },
-      };
-
-      await admin.messaging().send(notifMessage);
-    
+      });
     }
 
     res.json({
       success: true,
-      message: "Message sent successfully! 🚀",
+      message: "Message sent successfully!",
       data: message,
     });
+
   } catch (e) {
-    console.error(e);
+    console.error("Server Error:", e.message);
     res.status(500).json({ error: e.message });
   }
 });
