@@ -401,6 +401,61 @@ app.post("/send-message", async (req, res) => {
   }
 });
 
+
+app.put("/update-message/:messageId", async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { text, sender_id } = req.body;
+
+    if (!text || text.trim() === "") {
+      return res.status(400).json({ error: "Message text cannot be empty." });
+    }
+
+    const { data: message, error } = await supabase
+      .from("messages")
+      .update({ text: text.trim(), is_edited: true })
+      .eq("id", messageId)
+      .eq("sender_id", sender_id) 
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!message) return res.status(404).json({ error: "Message not found." });
+
+    res.json({ success: true, data: message });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete("/delete-message/:messageId", async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { sender_id } = req.body;
+
+    const { error } = await supabase
+      .from("messages")
+      .delete()
+      .eq("id", messageId)
+      .eq("sender_id", sender_id);
+
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+
+
+
+
+
+
 app.put("/mark-messages-read/:conversationId", async (req, res) => {
   const { conversationId } = req.params;
   const { userId } = req.body; 
@@ -419,6 +474,8 @@ app.put("/mark-messages-read/:conversationId", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+
 
 
 const PORT = process.env.PORT || 3000;
