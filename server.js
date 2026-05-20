@@ -113,7 +113,7 @@ app.post("/save-token", async (req, res) => {
 app.post("/create-post", async (req, res) => {
   try {
 
-    const { user_id, title, description, type, category, station_name } = req.body;
+    const { user_id, title, description, type, category, station_name,image_url } = req.body;
     
     const { data, error } = await supabase
       .from("posts") 
@@ -127,6 +127,7 @@ app.post("/create-post", async (req, res) => {
           station_name,
           is_active: true,
           created_at: new Date(),
+          image_url
         }
       ])
       .select()
