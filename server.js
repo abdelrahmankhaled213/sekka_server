@@ -110,8 +110,6 @@ app.post("/save-token", async (req, res) => {
   }
 });
 
-
-
 app.post("/create-post", async (req, res) => {
   try {
 
@@ -338,25 +336,37 @@ app.put("/update-comment/:commentId", async (req, res) => {
 
 app.post("/send-message", async (req, res) => {
   try {
-    const { conversation_id, sender_id, text } = req.body;
+    // 1. Destructure the exact fields coming from your Flutter client
+    const { 
+      conversation_id, 
+      sender_id, 
+      text, 
+      message_type, 
+      file_url 
+    } = req.body;
 
-    if (!text || text.trim() === "") {
+    // 2. Fix Validation: Only enforce non-empty text if it's a standard text message
+    const isTextMsg = !message_type || message_type === "text";
+    if (isTextMsg && (!text || text.trim() === "")) {
       return res.status(400).json({ error: "Message text cannot be empty." });
     }
 
+    // 3. Clean Insert: Save the clean data to your Supabase table
     const { data: message, error: msgError } = await supabase
       .from("messages")
       .insert([{
         conversation_id,
         sender_id,
-        text: text.trim(),
+        text: text ? text.trim() : "", 
+        message_type: message_type || "text",
+        file_url, // Saves the storage bucket link directly here
       }])
       .select()
       .single();
 
     if (msgError) throw msgError;
 
-
+    // 4. Fetch the conversation to determine who the receiver is
     const { data: conversation, error: convError } = await supabase
       .from("conversations")
       .select("user1_id, user2_id")
@@ -369,17 +379,28 @@ app.post("/send-message", async (req, res) => {
       ? conversation.user2_id
       : conversation.user1_id;
 
+    // 5. Look up the receiver's push notification token
     const { data: receiverData } = await supabase
       .from("user_devices")
       .select("token, current_chat_id")
       .eq("user_id", receiver_id)
       .maybeSingle();
 
+    // 6. Push Notification Logic: Customize the body if it's a media message
     if (receiverData?.token && receiverData?.current_chat_id !== conversation_id) {
+      let notificationBody = text ? text.trim() : "";
+      
+      // If text is blank because it's a pure image upload, set a clean fallback notification text
+      if (message_type === "image" && !notificationBody) {
+        notificationBody = "📷 Sent an image";
+      } else if (message_type && message_type !== "text" && !notificationBody) {
+        notificationBody = "📁 Sent a file";
+      }
+
       await admin.messaging().send({
         notification: {
           title: "New message",
-          body: text.trim(),
+          body: notificationBody,
         },
         token: receiverData.token,
         data: {
@@ -389,6 +410,7 @@ app.post("/send-message", async (req, res) => {
       });
     }
 
+    // 7. Respond back to Flutter with the newly created database record
     res.json({
       success: true,
       message: "Message sent successfully!",
@@ -450,11 +472,173 @@ app.delete("/delete-message/:messageId", async (req, res) => {
 });
 
 
+app.post("/trips", async (req, res) => {
+
+const{start_station_id, end_station_id, fcm_token} = req.body;
+
+if (!start_station_id || !end_station_id) {
+            return res.status(400).json({ 
+                error: "start_station_id and end_station_id are required." 
+            });
+        }
+
+
+        let formattedStatus = 'active';
+        if (req.body.status && req.body.status.includes('.')) {
+            formattedStatus = req.body.status.split('.').last || 'active'; 
+            formattedStatus = req.body.status.replace('TripStatus.', '');
+        }
+
+const { data: newTrip, error: tripError } = await supabase
+            .from('trips')
+            .insert([
+                {
+                    start_station_id: parseInt(start_station_id),
+                    end_station_id: parseInt(end_station_id),    
+                    status: formattedStatus,
+                    date: date || new Date().toISOString(),
+                  
+                }
+            ])
+            .select() 
+            .single();
+
+        if (tripError) {
+            throw tripError;
+        }
+        return res.status(201).json({ 
+            message: "Trip started successfully",
+            id: newTrip.id 
+        });
+
+  });
 
 
 
+  app.put("/trips/:tripId/completed", async (req, res) => {
+    try {
+        const { tripId } = req.params;
 
+        if (!tripId) {
+            return res.status(400).json({ error: "Trip ID is required." });
+        }
 
+        const { data: updatedTrip, error: updateError } = await supabase
+            .from('trips')
+            .update({ status: 'completed' })
+            .eq('id', tripId)
+            .select(`
+                token_id,
+                status,
+                end_station_id,
+                user_devices (token),
+                stops!end_station_id (name)
+            `)
+            .single();
+
+        if (updateError || !updatedTrip) {
+            console.error("Supabase Error:", updateError);
+            return res.status(404).json({ error: "Trip not found or could not be updated." });
+        }
+       
+        const token = updatedTrip.user_devices?.token;
+        const stationName = updatedTrip.stops?.name || "your destination";
+
+        
+        if (token) {
+            const message = {
+                notification: {
+                    title: 'Arrived Safely!',
+                    body: `You are approaching ${stationName} station. Please get ready to deboard. Have a great day with Sekka!`,
+                },
+                token: token,
+            };
+
+            admin.messaging().send(message)
+                .then((response) => console.log('Successfully sent FCM message:', response))
+                .catch((error) => console.error('Error sending FCM message:', error));
+        }
+
+       
+        return res.status(200).json({
+            message: "Trip marked as completed successfully.",
+            tripId: tripId,
+            status: "completed"
+        });
+
+    } catch (error) {
+        console.error("Error in notifyArrival endpoint:", error.message);
+        return res.status(500).json({
+            error: "Internal Server Error",
+            details: error.message
+        });
+    }
+});
+
+  
+app.put("/trips/:tripId/cancel", async (req, res) => {
+    try {
+        const { tripId } = req.params;
+
+        if (!tripId) {
+            return res.status(400).json({ error: "Trip ID is required." });
+        }
+
+        
+        const { data: updatedTrip, error: updateError } = await supabase
+            .from('trips')
+            .update({ status: 'cancelled' }) 
+            .eq('id', tripId)
+            .select(`
+                token_id,
+                end_station_id,
+                user_devices (token),
+                status,
+                stops!end_station_id (name)
+            `)
+            .single();
+
+        if (updateError || !updatedTrip) {
+            console.error("Supabase Error:", updateError);
+            return res.status(404).json({ error: "Trip not found or could not be cancelled." });
+        }
+
+        
+        
+        const fcmToken = updatedTrip.user_devices?.token;
+        const stationName = updatedTrip.stops?.name || "your destination";
+
+        
+        
+        if (fcmToken) {
+            const message = {
+                notification: {
+                    title: 'Trip Cancelled ',
+                    body: `Your trip tracking to ${stationName} station has been cancelled.`,
+                },
+                token: fcmToken,
+            };
+
+            admin.messaging().send(message)
+                .then((response) => console.log('Successfully sent Cancel FCM:', response))
+                .catch((error) => console.error('Error sending Cancel FCM:', error));
+        }
+
+        
+        return res.status(200).json({
+            message: "Trip tracking cancelled successfully.",
+            tripId: tripId,
+            status: "cancelled"
+        });
+
+    } catch (error) {
+        console.error("Error in cancelTrip endpoint:", error.message);
+        return res.status(500).json({
+            error: "Internal Server Error",
+            details: error.message
+        });
+    }
+});
 
 app.put("/mark-messages-read/:conversationId", async (req, res) => {
   const { conversationId } = req.params;
