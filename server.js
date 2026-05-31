@@ -491,7 +491,7 @@ if (!start_station_id || !end_station_id) {
         }
 
 const { data: newTrip, error: tripError } = await supabase
-            .from('trips')
+            .from('trip_tracking')
             .insert([
                 {
                     start_station_id: parseInt(start_station_id),
