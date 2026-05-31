@@ -496,6 +496,7 @@ const { data: newTrip, error: tripError } = await supabase
                 {
                     start_station_id: parseInt(start_station_id),
                     end_station_id: parseInt(end_station_id),    
+                    fcm_token: fcm_token,
                     status: formattedStatus,
                     date: date || new Date().toISOString(),
                   
