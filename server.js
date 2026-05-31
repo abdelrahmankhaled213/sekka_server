@@ -474,8 +474,8 @@ app.delete("/delete-message/:messageId", async (req, res) => {
 
 
 app.post("/trips", async (req, res) => {
-
-const{start_station_id, end_station_id, fcm_token} = req.body;
+  
+const { start_station_id, end_station_id, fcm_token, status, date } = req.body; 
 
 if (!start_station_id || !end_station_id) {
             return res.status(400).json({ 
