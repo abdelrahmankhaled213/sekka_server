@@ -472,128 +472,174 @@ app.delete("/delete-message/:messageId", async (req, res) => {
   }
 });
 
-// ✅ startTrip — اتحقق من active trip الأول
+
 app.post("/trips", async (req, res) => {
-  try {
-    const { start_station_id, end_station_id, fcm_token, status, date } = req.body;
+  
+const { start_station_id, end_station_id, fcm_token, status, date } = req.body; 
 
-    if (!start_station_id || !end_station_id) {
-      return res.status(400).json({ error: "start_station_id and end_station_id are required." });
+if (!start_station_id || !end_station_id) {
+            return res.status(400).json({ 
+                error: "start_station_id and end_station_id are required." 
+            });
+        }
+
+
+        let formattedStatus = 'active';
+        if (req.body.status && req.body.status.includes('.')) {
+            formattedStatus = req.body.status.split('.').last || 'active'; 
+            formattedStatus = req.body.status.replace('TripStatus.', '');
+        }
+
+const { data: newTrip, error: tripError } = await supabase
+            .from('trip_tracking')
+            .insert([
+                {
+                    start_station_id: parseInt(start_station_id),
+                    end_station_id: parseInt(end_station_id),    
+                    fcm_token: fcm_token,
+                    status: formattedStatus,
+                    date: date || new Date().toISOString(),
+                  
+                }
+            ])
+            .select() 
+            .single();
+
+        if (tripError) {
+            throw tripError;
+        }
+        return res.status(201).json({ 
+            message: "Trip started successfully",
+            id: newTrip.id 
+        });
+
+  });
+
+
+
+  app.put("/trips/:tripId/completed", async (req, res) => {
+    try {
+        const { tripId } = req.params;
+
+        if (!tripId) {
+            return res.status(400).json({ error: "Trip ID is required." });
+        }
+
+        const { data: updatedTrip, error: updateError } = await supabase
+            .from('trips')
+            .update({ status: 'completed' })
+            .eq('id', tripId)
+            .select(`
+                token_id,
+                status,
+                end_station_id,
+                user_devices (token),
+                stops!end_station_id (name)
+            `)
+            .single();
+
+        if (updateError || !updatedTrip) {
+            console.error("Supabase Error:", updateError);
+            return res.status(404).json({ error: "Trip not found or could not be updated." });
+        }
+       
+        const token = updatedTrip.user_devices?.token;
+        const stationName = updatedTrip.stops?.name || "your destination";
+
+        
+        if (token) {
+            const message = {
+                notification: {
+                    title: 'Arrived Safely!',
+                    body: `You are approaching ${stationName} station. Please get ready to deboard. Have a great day with Sekka!`,
+                },
+                token: token,
+            };
+
+            admin.messaging().send(message)
+                .then((response) => console.log('Successfully sent FCM message:', response))
+                .catch((error) => console.error('Error sending FCM message:', error));
+        }
+
+       
+        return res.status(200).json({
+            message: "Trip marked as completed successfully.",
+            tripId: tripId,
+            status: "completed"
+        });
+
+    } catch (error) {
+        console.error("Error in notifyArrival endpoint:", error.message);
+        return res.status(500).json({
+            error: "Internal Server Error",
+            details: error.message
+        });
     }
-
-    // ✅ تحقق من active trip
-    const { data: activeTrip } = await supabase
-      .from('trip_tracking')
-      .select('id')
-      .eq('status', 'active')
-      .maybeSingle();
-
-    if (activeTrip) {
-      return res.status(409).json({ error: "You already have an active trip. Cancel it first." });
-    }
-
-    let formattedStatus = 'active';
-    if (req.body.status?.includes('.')) {
-      formattedStatus = req.body.status.replace('TripStatus.', '');
-    }
-
-    const { data: newTrip, error: tripError } = await supabase
-      .from('trip_tracking') // ✅ نفس الـ table
-      .insert([{
-        start_station_id: parseInt(start_station_id),
-        end_station_id:   parseInt(end_station_id),
-        fcm_token:        fcm_token,
-        status:           formattedStatus,
-        date:             date || new Date().toISOString(),
-      }])
-      .select()
-      .single();
-
-    if (tripError) throw tripError;
-
-    return res.status(201).json({ message: "Trip started successfully", id: newTrip.id });
-
-  } catch (error) {
-    console.error('startTrip error:', error.message);
-    return res.status(500).json({ error: error.message });
-  }
 });
 
-// ✅ cancelTrip — نفس الـ table
+  
 app.put("/trips/:tripId/cancel", async (req, res) => {
-  try {
-    const { tripId } = req.params;
-    if (!tripId) return res.status(400).json({ error: "Trip ID is required." });
+    try {
+        const { tripId } = req.params;
 
-    const { data: updatedTrip, error: updateError } = await supabase
-      .from('trip_tracking') // ✅ ظبطنا الـ table
-      .update({ status: 'cancelled' })
-      .eq('id', tripId)
-      .select('id, end_station_id, fcm_token, status')
-      .single();
+        if (!tripId) {
+            return res.status(400).json({ error: "Trip ID is required." });
+        }
 
-    if (updateError || !updatedTrip) {
-      return res.status(404).json({ error: "Trip not found or could not be cancelled." });
+        
+        const { data: updatedTrip, error: updateError } = await supabase
+            .from('trips')
+            .update({ status: 'cancelled' }) 
+            .eq('id', tripId)
+            .select(`
+                token_id,
+                end_station_id,
+                user_devices (token),
+                status,
+                stops!end_station_id (name)
+            `)
+            .single();
+
+        if (updateError || !updatedTrip) {
+            console.error("Supabase Error:", updateError);
+            return res.status(404).json({ error: "Trip not found or could not be cancelled." });
+        }
+
+        
+        
+        const fcmToken = updatedTrip.user_devices?.token;
+        const stationName = updatedTrip.stops?.name || "your destination";
+
+        
+        
+        if (fcmToken) {
+            const message = {
+                notification: {
+                    title: 'Trip Cancelled ',
+                    body: `Your trip tracking to ${stationName} station has been cancelled.`,
+                },
+                token: fcmToken,
+            };
+
+            admin.messaging().send(message)
+                .then((response) => console.log('Successfully sent Cancel FCM:', response))
+                .catch((error) => console.error('Error sending Cancel FCM:', error));
+        }
+
+        
+        return res.status(200).json({
+            message: "Trip tracking cancelled successfully.",
+            tripId: tripId,
+            status: "cancelled"
+        });
+
+    } catch (error) {
+        console.error("Error in cancelTrip endpoint:", error.message);
+        return res.status(500).json({
+            error: "Internal Server Error",
+            details: error.message
+        });
     }
-
-    // ✅ بعت FCM لو فيه token
-    if (updatedTrip.fcm_token) {
-      const message = {
-        notification: {
-          title: 'Trip Cancelled',
-          body:  'Your trip tracking has been cancelled.',
-        },
-        token: updatedTrip.fcm_token,
-      };
-      admin.messaging().send(message).catch(err => 
-        console.error('Cancel FCM error:', err)
-      );
-    }
-
-    return res.status(200).json({ message: "Trip cancelled successfully.", tripId, status: "cancelled" });
-
-  } catch (error) {
-    console.error('cancelTrip error:', error.message);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ✅ completed — نفس الـ table
-app.put("/trips/:tripId/completed", async (req, res) => {
-  try {
-    const { tripId } = req.params;
-    if (!tripId) return res.status(400).json({ error: "Trip ID is required." });
-
-    const { data: updatedTrip, error: updateError } = await supabase
-      .from('trip_tracking') // ✅ ظبطنا الـ table
-      .update({ status: 'completed' })
-      .eq('id', tripId)
-      .select('id, end_station_id, fcm_token, status')
-      .single();
-
-    if (updateError || !updatedTrip) {
-      return res.status(404).json({ error: "Trip not found or could not be updated." });
-    }
-
-    if (updatedTrip.fcm_token) {
-      const message = {
-        notification: {
-          title: 'Arrived Safely! 🎉',
-          body:  'You have reached your destination. Have a great day with Sekka!',
-        },
-        token: updatedTrip.fcm_token,
-      };
-      admin.messaging().send(message).catch(err => 
-        console.error('Arrival FCM error:', err)
-      );
-    }
-
-    return res.status(200).json({ message: "Trip completed successfully.", tripId, status: "completed" });
-
-  } catch (error) {
-    console.error('notifyArrival error:', error.message);
-    return res.status(500).json({ error: error.message });
-  }
 });
 
 app.put("/mark-messages-read/:conversationId", async (req, res) => {
