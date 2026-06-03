@@ -309,7 +309,6 @@ app.post("/create-comment", async (req, res) => {
         user_id,
         post_id,
         content,
-        created_at: new Date(),
       },
     ]);
 
