@@ -189,6 +189,7 @@ app.get("/get-posts", async (req, res) => {
   }
 });
 
+
 app.get("/get_posts/:id",async(req,res)=>{
 
 const {id}=req.params;
@@ -226,6 +227,47 @@ try{
 } 
 
 )
+
+app.delete("/delete-post/:postId", async (req, res) => {
+  try {
+    const { postId } = req.params;
+
+    const { data, error } = await supabase
+      .from("posts")
+      .delete()
+      .eq("id", postId);
+
+    if (error) throw error;
+    res.json({
+      success: true,
+      message: "Post deleted successfully! 🚀",
+      data: data,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put("/update-post/:postId", async (req, res) => {
+
+  try {
+    const { postId } = req.params;
+    const { title, description, type, category, station_name,image_url } = req.body;
+    const { data, error } = await supabase
+      .from("posts")
+      .update({ title, description, type, category, station_name,image_url })
+      .eq("id", postId);
+
+    if (error) throw error;
+    res.json({
+      success: true,
+      message: "Post updated successfully! 🚀",
+      data: data,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 
 app.get("/get-post-comments/:postId", async (req, res) => {
@@ -296,6 +338,7 @@ app.post("/create-comment", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
 
 app.delete("/delete-comment/:commentId", async (req, res) => {
   try {
