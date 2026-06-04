@@ -269,6 +269,68 @@ app.put("/update-post/:postId", async (req, res) => {
   }
 });
 
+app.put("/toggle-post/:postId", async (req, res) => {
+
+  try {
+    const { postId } = req.params;
+    const { is_saved } = req.body;
+
+    const { data, error } = await supabase
+      .from("posts")
+      .update({ is_saved })
+      .eq("id", postId);
+
+    if (error) throw error;
+    res.json({
+      success: true,
+      message: "Post status updated successfully! 🚀",
+      data: data,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/get-saved-posts/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const { data, error } = await supabase
+      .from("posts")
+      .select(`
+        *,
+        users ( 
+          name,
+          image
+        ),
+        comments (
+          content,
+          created_at,
+          user_id,
+          users ( 
+            name,
+            image
+          )
+        )
+      `)
+      .eq("is_saved", true)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      data: data,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+
+
 
 app.get("/get-post-comments/:postId", async (req, res) => {
   try {
@@ -299,6 +361,8 @@ app.get("/get-post-comments/:postId", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+
 
 app.post("/create-comment", async (req, res) => {
   try {
