@@ -291,6 +291,57 @@ app.put("/toggle-post/:postId", async (req, res) => {
   }
 });
 
+app.get("/posts/:postId", async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const userId = req.headers.user_id; // أو تبعته في الـ query params زي ما تحب
+
+    // 1. بنجيب بيانات البوست كاملة
+    const { data: postData, error: postError } = await supabase
+      .from("posts")
+      .select(`
+        *,
+        users (name, image),
+        comments (
+          content,
+          created_at,
+          user_id,
+          users (name, image)
+        )
+      `)
+      .eq("id", postId)
+      .single();
+
+    if (postError) throw postError;
+
+    // 2. بنتشيك هل الـ User الحالي مسيف البوست ده ولا لأ من جدول الـ saved_posts
+    let isSaved = false;
+    if (userId) {
+      const { data: savedData } = await supabase
+        .from("saved_posts")
+        .select("id")
+        .eq("post_id", postId)
+        .eq("user_id", userId)
+        .maybeSingle(); // لو لقى سطر تمام ملقاش مش هيضرب error
+
+      if (savedData) isSaved = true;
+    }
+
+    // 3. بندمج حالة الـ saved جوة الـ response
+    res.json({
+      success: true,
+      data: {
+        ...postData,
+        is_saved: isSaved // القيمة دي هتبقا تفصيلية لكل مستخدم
+      },
+    });
+
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
 app.get("/get-saved-posts/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
